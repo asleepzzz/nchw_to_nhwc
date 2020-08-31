@@ -106,7 +106,7 @@ int main(int argc, char *argv[])
         half tmp(1.0);
         half tmp2(0.0);
         //half min is 0.00006,so use 0.0001*constant,due to C*R*S=2880,if diff <0.001,it's ok
-        in[i] =  half_cast<half>(1.0f);
+        in[i] =  half_cast<half>(3.0f);
     }
 
     for (int i =0;i< K * C* R* S;i++)
@@ -276,5 +276,9 @@ int main(int argc, char *argv[])
 
     free(host_float_test);
     free(host_int_test);
+    free(out);
+    free(in);
+    free(wei);
+    free(cpu_out);
     return 0;
 }

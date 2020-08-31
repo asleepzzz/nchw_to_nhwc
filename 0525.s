@@ -180,6 +180,8 @@ div_int_vv_rm vgpr_write_c_8_id,vgpr_write_hw_id,vgpr_thread_id,vgpr_write_c_per
 
 s_waitcnt     lgkmcnt(0);
 
+s_mul_i32 s[sgpr_HiWi],s[sgpr_Wi],s[sgpr_Hi]
+s_mul_i32 s[sgpr_CHiWi],s[sgpr_C],s[sgpr_HiWi]
 
 s_mov_b32 s[sgpr_read_limit],s[sgpr_HiWi]
 s_mul_i32 s[sgpr_read_limit],s[sgpr_read_limit],s[sgpr_C]
@@ -207,10 +209,11 @@ v_lshlrev_b32_e32 v[vgpr_thread_A_addr], s[sgpr_datatype_log2], v[vgpr_thread_A_
 s_mov_b32 s[sgpr_buf_read_addr],s[sgpr_block_start_addr]
 s_mov_b32 s[sgpr_buf_read_addr+1],s[sgpr_block_start_addr+1]
 s_mov_b32 s[sgpr_buf_read_addr+2],-1
-s_mov_b32 s[sgpr_buf_read_addr+3],s[sgpr_read_limit]
+s_mov_b32 s[sgpr_buf_read_addr+3],0x27000;s[sgpr_read_limit]
 
-buffer_load_dwordx4 v[vgpr_read_value:vgpr_read_value+3],v[vgpr_thread_A_addr],s[sgpr_buf_read_addr:sgpr_buf_read_addr+3],0, offen offset:0
-
+;v_mov_b32_e32 v[vgpr_thread_A_addr],0
+;buffer_load_dwordx4 v[vgpr_read_value:vgpr_read_value+3],v[vgpr_thread_A_addr],s[sgpr_buf_read_addr:sgpr_buf_read_addr+3],0, offen offset:0
+buffer_load_ushort v[vgpr_read_value],v[vgpr_thread_A_addr],s[sgpr_buf_read_addr:sgpr_buf_read_addr+3],0, offen offset:0
 
 kevin_write_test:
 
@@ -227,14 +230,14 @@ s_cbranch_scc0 read_end
 v_cmpx_eq_u32 s[sgpr_tmp_cmp_positive:sgpr_tmp_cmp_positive+1], v[vgpr_thread_id],0
 
 
-v_mov_b32_e32 v[vgpr_B_ushort1],v[vgpr_read_value+1]
+;v_mov_b32_e32 v[vgpr_B_ushort1],v[vgpr_read_value]
 ;v_cvt_f16_f32_e32     v[vgpr_B_ushort1],v[vgpr_B_ushort1]
 
 v_mov_b32_e32 v[vgpr_store_addr],0
 v_mov_b32_e32 v[vgpr_store_addr+1],0
 
-;global_store_short v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_B_ushort1], s[sgpr_kevin_test_float_addr:sgpr_kevin_test_float_addr+1]
-global_store_short_d16_hi v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_B_ushort1], s[sgpr_kevin_test_float_addr:sgpr_kevin_test_float_addr+1]
+global_store_short v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_read_value], s[sgpr_kevin_test_float_addr:sgpr_kevin_test_float_addr+1]
+;global_store_short_d16_hi v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_B_ushort1], s[sgpr_kevin_test_float_addr:sgpr_kevin_test_float_addr+1]
 
 
 
