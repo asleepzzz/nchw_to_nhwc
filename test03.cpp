@@ -106,13 +106,13 @@ int main(int argc, char *argv[])
         half tmp(1.0);
         half tmp2(0.0);
         //half min is 0.00006,so use 0.0001*constant,due to C*R*S=2880,if diff <0.001,it's ok
-        in[i] =  half_cast<half>(3.0f);
+        in[i] =  half_cast<half>(1.0f*((int)(i%128)));
     }
 
     for (int i =0;i< K * C* R* S;i++)
     {
         half tmp(1.0);
-        wei[i] = half_cast<half>(1.0f*i);
+        wei[i] = half_cast<half>(1.0f);
     }
 
     for (int i =0;i< N * K* Oh* Ow;i++)

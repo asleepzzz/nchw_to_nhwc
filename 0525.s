@@ -212,8 +212,8 @@ s_mov_b32 s[sgpr_buf_read_addr+2],-1
 s_mov_b32 s[sgpr_buf_read_addr+3],0x27000;s[sgpr_read_limit]
 
 ;v_mov_b32_e32 v[vgpr_thread_A_addr],0
-;buffer_load_dwordx4 v[vgpr_read_value:vgpr_read_value+3],v[vgpr_thread_A_addr],s[sgpr_buf_read_addr:sgpr_buf_read_addr+3],0, offen offset:0
-buffer_load_ushort v[vgpr_read_value],v[vgpr_thread_A_addr],s[sgpr_buf_read_addr:sgpr_buf_read_addr+3],0, offen offset:0
+buffer_load_dwordx4 v[vgpr_read_value:vgpr_read_value+3],v[vgpr_thread_A_addr],s[sgpr_buf_read_addr:sgpr_buf_read_addr+3],0, offen offset:0
+;buffer_load_ushort v[vgpr_read_value],v[vgpr_thread_A_addr],s[sgpr_buf_read_addr:sgpr_buf_read_addr+3],0, offen offset:0
 
 kevin_write_test:
 
@@ -237,7 +237,7 @@ v_mov_b32_e32 v[vgpr_store_addr],0
 v_mov_b32_e32 v[vgpr_store_addr+1],0
 
 global_store_short v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_read_value], s[sgpr_kevin_test_float_addr:sgpr_kevin_test_float_addr+1]
-;global_store_short_d16_hi v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_B_ushort1], s[sgpr_kevin_test_float_addr:sgpr_kevin_test_float_addr+1]
+;global_store_short_d16_hi v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_read_value], s[sgpr_kevin_test_float_addr:sgpr_kevin_test_float_addr+1]
 
 
 
