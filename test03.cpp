@@ -273,5 +273,8 @@ int main(int argc, char *argv[])
     HIP_ASSERT(hipFree(dev_out));
     HIP_ASSERT(hipFree(kevin_int_test));
     HIP_ASSERT(hipFree(kevin_float_test));
+
+    free(host_float_test);
+    free(host_int_test);
     return 0;
 }

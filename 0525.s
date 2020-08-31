@@ -33,7 +33,7 @@ gridwise_group_convolution_forward_implicit_gemm_v4r4_xdlops_nchw_kcyx_nkhw: ; @
 ;.set sgpr_Wo,37;
 
 .set sgpr_C_addr,34;
-.set sgpr_buf_A_addr,24;//24 25 26 27
+.set sgpr_buf_read_addr,24;//24 25 26 27
 .set sgpr_before_cmp_thread,28;//28 29
 .set sgpr_tmp_cmp_thread,30;//30 31
 .set Srd127_96, 0x0020000
@@ -45,12 +45,14 @@ gridwise_group_convolution_forward_implicit_gemm_v4r4_xdlops_nchw_kcyx_nkhw: ; @
 .set sgpr_move_bytes,36
 ;.set sgpr_write_c_1_threads,37
 .set sgpr_block_start_addr,38;//38 39
-.set sgpr_buf_A_addr,40;//40 41 42 43
+.set sgpr_buf_read_addr,40;//40 41 42 43
 .set sgpr_read_limit,44
 .set sgpr_loop_num,45
 
 .set sgpr_div_tmp4,48;// 48 49 50 51
+.set sgpr_read_limit_n,48
 
+.set sgpr_tmp_cmp_positive,52;//52 53
 
 
 .set vgpr_thread_id,0
@@ -62,7 +64,7 @@ gridwise_group_convolution_forward_implicit_gemm_v4r4_xdlops_nchw_kcyx_nkhw: ; @
 .set vgpr_tmp_sgpr,6
 ;.set vgpr_tmp_c0_tid,7 
 
-.set vgpr_A_value,8;//8 9 10 11
+.set vgpr_read_value,8;//8 9 10 11
 .set vgpr_lds_addr_1,12
 .set vgpr_lds_addr_2,13
 .set vgpr_lds_addr_3,14
@@ -99,7 +101,7 @@ gridwise_group_convolution_forward_implicit_gemm_v4r4_xdlops_nchw_kcyx_nkhw: ; @
 ;.set vgpr_B_tid,8
 ;.set vgpr_tmp,7
 
-.set vgpr_B_ushort1,20
+.set vgpr_B_ushort1,29
 ;.set vgpr_B_ushort2,21
 ;.set vgpr_B_ushort3,22
 ;.set vgpr_B_ushort4,23
@@ -179,8 +181,83 @@ div_int_vv_rm vgpr_write_c_8_id,vgpr_write_hw_id,vgpr_thread_id,vgpr_write_c_per
 s_waitcnt     lgkmcnt(0);
 
 
+s_mov_b32 s[sgpr_read_limit],s[sgpr_HiWi]
+s_mul_i32 s[sgpr_read_limit],s[sgpr_read_limit],s[sgpr_C]
+s_add_u32 s[sgpr_read_limit_n],s[sgpr_workgroup_id],1
+s_mul_i32 s[sgpr_read_limit],s[sgpr_read_limit], s[sgpr_read_limit_n]
+s_lshl_b32 s[sgpr_read_limit],s[sgpr_read_limit],s[sgpr_datatype_log2];//(n+1) * Chw*2
+
+s_lshl_b32  s[sgpr_block_start_addr],s[sgpr_CHiWi],s[sgpr_datatype_log2];//bytes
+s_mul_i32 s[sgpr_block_start_addr],s[sgpr_workgroup_id],s[sgpr_block_start_addr];n*CHW*2
+s_mov_b32 s[sgpr_block_start_addr+1],0
 
 
+
+s_add_u32     s[sgpr_block_start_addr], s[sgpr_B_addr], s[sgpr_block_start_addr]
+s_addc_u32    s[sgpr_block_start_addr+1], s[sgpr_B_addr+1], 0
+
+
+v_mul_lo_u32 v[vgpr_thread_A_addr],v[vgpr_thread_id],s[sgpr_HiWi];tid*hw
+v_lshlrev_b32_e32 v[vgpr_thread_A_addr], s[sgpr_datatype_log2], v[vgpr_thread_A_addr];//tid*HW*2; even you have c ,everytime every thread handle 1 c
+
+
+
+
+
+s_mov_b32 s[sgpr_buf_read_addr],s[sgpr_block_start_addr]
+s_mov_b32 s[sgpr_buf_read_addr+1],s[sgpr_block_start_addr+1]
+s_mov_b32 s[sgpr_buf_read_addr+2],-1
+s_mov_b32 s[sgpr_buf_read_addr+3],s[sgpr_read_limit]
+
+buffer_load_dwordx4 v[vgpr_read_value:vgpr_read_value+3],v[vgpr_thread_A_addr],s[sgpr_buf_read_addr:sgpr_buf_read_addr+3],0, offen offset:0
+
+
+kevin_write_test:
+
+
+s_waitcnt     lgkmcnt(0)
+s_waitcnt vmcnt(0)
+
+s_or_saveexec_b64 s[sgpr_before_cmp_thread:sgpr_before_cmp_thread+1],exec
+s_cmp_eq_u32  s[sgpr_workgroup_id], 3
+s_cbranch_scc0 read_end
+
+
+
+v_cmpx_eq_u32 s[sgpr_tmp_cmp_positive:sgpr_tmp_cmp_positive+1], v[vgpr_thread_id],0
+
+
+v_mov_b32_e32 v[vgpr_B_ushort1],v[vgpr_read_value+1]
+;v_cvt_f16_f32_e32     v[vgpr_B_ushort1],v[vgpr_B_ushort1]
+
+v_mov_b32_e32 v[vgpr_store_addr],0
+v_mov_b32_e32 v[vgpr_store_addr+1],0
+
+;global_store_short v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_B_ushort1], s[sgpr_kevin_test_float_addr:sgpr_kevin_test_float_addr+1]
+global_store_short_d16_hi v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_B_ushort1], s[sgpr_kevin_test_float_addr:sgpr_kevin_test_float_addr+1]
+
+
+
+s_waitcnt vmcnt(0)
+
+
+s_nor_saveexec_b64 exec,s[sgpr_tmp_cmp_positive:sgpr_tmp_cmp_positive+1] ;//not thread 0
+
+
+
+;v_lshrrev_b16 
+
+
+
+;V_LSHRREV_B16
+
+;v_cvt_f16_f32_e32     v[vgpr_B_ushort1],v[vgpr_B_ushort1]
+
+
+
+
+
+/*
 s_lshl_b32 s[sgpr_move_bytes],2,s[sgpr_datatype_log2]
 
 s_mul_i32 s[sgpr_HiWi],s[sgpr_Wi],s[sgpr_Hi]
@@ -189,6 +266,7 @@ s_mul_i32 s[sgpr_CHiWi],s[sgpr_C],s[sgpr_HiWi]
 
 
 ;s_mul_i32 s[sgpr_read_limit],s[sgpr_C0],s[sgpr_HiWi]
+;s_mul_i32 s[sgpr_read_limit],s[sgpr_read_limit],s[sgpr_C]
 s_mov_b32 s[sgpr_read_limit],s[sgpr_HiWi]
 s_lshl_b32 s[sgpr_read_limit],s[sgpr_read_limit],s[sgpr_datatype_log2];//hw*2
 
@@ -198,8 +276,6 @@ s_mov_b32 s[sgpr_block_start_addr+1],0
 
 
 
-;v_mul_lo_u32 v[vgpr_tmp_c0_tid],v[vgpr_thread_id],s[sgpr_C0];tid*c0
-;v_mul_lo_u32 v[vgpr_thread_A_addr],v[vgpr_tmp_c0_tid],s[sgpr_HiWi];tid*c0*HW
 
 v_mul_lo_u32 v[vgpr_thread_A_addr],v[vgpr_thread_id],s[sgpr_HiWi];tid*hw
 
@@ -207,8 +283,6 @@ v_mul_lo_u32 v[vgpr_thread_A_addr],v[vgpr_thread_id],s[sgpr_HiWi];tid*hw
 v_lshlrev_b32_e32 v[vgpr_thread_A_addr], s[sgpr_datatype_log2], v[vgpr_thread_A_addr];//tid*HW*2
 v_mov_b32_e32 v[vgpr_thread_A_addr+1],0
 
-;v_mov_b32_e32 v[vgpr_tmp_sgpr],s[sgpr_block_start_addr]
-;v_add_u32_e32 v[vgpr_thread_A_addr], v[vgpr_thread_A_addr], v[vgpr_tmp_sgpr]
 
 
 ;you need a loop to handle 0 to c0,everytime add hw*2
@@ -291,10 +365,10 @@ write_test:
 v_mov_b32_e32 v[vgpr_B_ushort1],s[sgpr_block_start_addr]
 v_mov_b32_e32 v[vgpr_store_addr],0
 v_mov_b32_e32 v[vgpr_store_addr+1],0
-global_store_dword v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_B_ushort1], s[sgpr_kevin_test_uint_addr:sgpr_kevin_test_uint_addr+1]
+global_store_dword v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_B_ushort1], s[sgpr_kevin_test_float_addr:sgpr_kevin_test_float_addr+1]
 s_waitcnt vmcnt(0)
 
-
+*/
 
 
 
@@ -404,7 +478,7 @@ s_mov_b64 exec,s[sgpr_before_cmp_thread:sgpr_before_cmp_thread+1]
 
 
 read_end:
-
+ s_mov_b64 exec,s[sgpr_before_cmp_thread:sgpr_before_cmp_thread+1]
 
 	s_endpgm
 	.section	.rodata,#alloc
@@ -518,6 +592,8 @@ amdhsa.kernels:
         .size:           4
         .value_kind:     by_value
         .value_type:     u32
+
+
       - .address_space:  generic
         .name:           p_C
         .offset:         44
@@ -547,6 +623,9 @@ amdhsa.kernels:
         .size:           4
         .value_kind:     by_value
         .value_type:     u32
+
+
+
 
 
 
