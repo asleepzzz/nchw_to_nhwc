@@ -227,7 +227,7 @@ s_cbranch_scc0 read_end
 
 
 
-v_cmpx_eq_u32 s[sgpr_tmp_cmp_positive:sgpr_tmp_cmp_positive+1], v[vgpr_thread_id],0
+v_cmpx_eq_u32 s[sgpr_tmp_cmp_positive:sgpr_tmp_cmp_positive+1], v[vgpr_thread_id],1
 
 
 ;v_mov_b32_e32 v[vgpr_B_ushort1],v[vgpr_read_value]
