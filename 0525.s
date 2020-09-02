@@ -40,10 +40,13 @@ gridwise_group_convolution_forward_implicit_gemm_v4r4_xdlops_nchw_kcyx_nkhw: ; @
 .set S32,32
 .set sgpr_32,32
 ;.set sgpr_CHiWi,33
-
 .set sgpr_base_hwid_every_round, 33
 .set sgpr_base_cid_every_round, 34
+
+
 .set sgpr_threads_package_size,35
+.set sgpr_threads_package_size_log2,46
+
 
 .set sgpr_move_bytes,36
 ;.set sgpr_write_c_1_threads,37
@@ -52,7 +55,7 @@ gridwise_group_convolution_forward_implicit_gemm_v4r4_xdlops_nchw_kcyx_nkhw: ; @
 .set sgpr_buf_write_addr,40;//40 41 42 43
 .set sgpr_read_limit,44
 .set sgpr_loop_num,45
-
+.set sgpr_tmp_int,46
 .set sgpr_div_tmp4,48;// 48 49 50 51
 .set sgpr_read_limit_n,48
 
@@ -84,12 +87,13 @@ gridwise_group_convolution_forward_implicit_gemm_v4r4_xdlops_nchw_kcyx_nkhw: ; @
 .set vgpr_lds_read8,24;24 25 26 27
 
 .set vgpr_div_tmp4,28;//28 29 30 31
-
+.set vgpr_tmp_1,29
 .set vgpr_write_c_per_thread,32
 .set vgpr_write_hw_id,33
-.set vgpr_write_c_8_id,34
+.set vgpr_write_c_id,34
 
 .set vgpr_thread_A_write_offset,36;//36 37
+
 
 ;.set vgpr_tmp_int,9
 ;.set vgpr_wave_tid,10
@@ -120,8 +124,28 @@ gridwise_group_convolution_forward_implicit_gemm_v4r4_xdlops_nchw_kcyx_nkhw: ; @
 
 
 
-.macro decide_threads_package_log2 s_threads, s_load_vectors, s_packages, s_packes_log2
+.macro decide_threads_package_log2 s_threads, s_load_vectors, s_packages, s_packages_log2;//we use s_load_vectors =8 here, should add more after
+s_or_saveexec_b64 s[sgpr_before_cmp_thread:sgpr_before_cmp_thread+1],exec
+s_cmp_eq_u32  s[\s_threads], 64
 
+s_cbranch_scc0 not_64
+s_mov_b32 s[\s_packages],8
+s_mov_b32 s[\s_packages_log2],3
+s_branch decide_end
+
+not_64:
+s_cmp_eq_u32  s[\s_threads], 128
+s_cbranch_scc0 not_64_128
+s_mov_b32 s[\s_packages],16
+s_mov_b32 s[\s_packages_log2],4
+s_branch decide_end
+
+not_64_128:
+s_mov_b32 s[\s_packages],32
+s_mov_b32 s[\s_packages_log2],5
+
+decide_end:
+s_mov_b64 exec,s[sgpr_before_cmp_thread:sgpr_before_cmp_thread+1]
 .endm
 
 
@@ -183,9 +207,22 @@ s_mov_b32 s[sgpr_base_cid_every_round],0
 
 
 
-v_lshrrev_b32_e32 v[vgpr_write_c_per_thread],3,v[vgpr_thread_id]
+decide_threads_package_log2 sgpr_threads, sgpr_load_everytime, sgpr_threads_package_size, sgpr_threads_package_size_log2
+
+;//hw_id=(tid/sgpr_threads_package_size)
+;//c_id =(tid%sgpr_threads_package_size)
+v_lshrrev_b32_e32 v[vgpr_write_hw_id] ,s[sgpr_threads_package_size_log2],v[vgpr_thread_id]
+v_mov_b32_e32 v[vgpr_div_tmp4],s[sgpr_threads_package_size_log2]
+v_mov_b32_e32 v[vgpr_tmp_1],1
+v_lshlrev_b32_e32 v[vgpr_div_tmp4+1],v[vgpr_div_tmp4],v[vgpr_tmp_1]
+v_mul_lo_u32 v[vgpr_div_tmp4+1],v[vgpr_div_tmp4+1],v[vgpr_write_hw_id]
+v_sub_u32_e32 v[vgpr_write_c_id], v[vgpr_thread_id], v[vgpr_div_tmp4+1]
+
+
+;v_lshrrev_b32_e32 v[vgpr_write_c_per_thread],3,v[vgpr_thread_id]
 ;//calculate 
-div_int_vv_rm vgpr_write_c_8_id,vgpr_write_hw_id,vgpr_thread_id,vgpr_write_c_per_thread,vgpr_div_tmp4,sgpr_div_tmp4
+;div_int_vv_rm vgpr_write_c_8_id,vgpr_write_hw_id,vgpr_thread_id,vgpr_write_c_per_thread,vgpr_div_tmp4,sgpr_div_tmp4
+
 
 
 
@@ -266,8 +303,8 @@ s_cmp_eq_u32  s[sgpr_workgroup_id], 0
 s_cbranch_scc0 read_end
 
 
-
-v_cmpx_eq_u32 s[sgpr_tmp_cmp_positive:sgpr_tmp_cmp_positive+1], v[vgpr_thread_id],0
+s_mov_b32 s63,35
+v_cmpx_eq_u32 s[sgpr_tmp_cmp_positive:sgpr_tmp_cmp_positive+1], v[vgpr_thread_id],s63
 
 
 ;v_mov_b32_e32 v[vgpr_B_ushort1],v[vgpr_read_value]
@@ -278,7 +315,7 @@ v_mov_b32_e32 v[vgpr_store_addr+1],0
 
 buffer_store_dwordx4 v[vgpr_read_value:vgpr_read_value+3],v[vgpr_thread_A_addr],s[sgpr_buf_write_addr:sgpr_buf_write_addr+3],0, offen offset:0
 
-;global_store_short v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_read_value], s[sgpr_kevin_test_float_addr:sgpr_kevin_test_float_addr+1]
+global_store_dword v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_write_c_id], s[sgpr_kevin_test_uint_addr:sgpr_kevin_test_uint_addr+1]
 ;global_store_short_d16_hi v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_read_value], s[sgpr_kevin_test_float_addr:sgpr_kevin_test_float_addr+1]
 
 
