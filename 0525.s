@@ -49,6 +49,7 @@ gridwise_group_convolution_forward_implicit_gemm_v4r4_xdlops_nchw_kcyx_nkhw: ; @
 
 
 .set sgpr_move_bytes,36
+.set sgpr_CHiWi,37
 ;.set sgpr_write_c_1_threads,37
 .set sgpr_block_start_addr,38;//38 39
 .set sgpr_buf_read_addr,40;//40 41 42 43
@@ -92,7 +93,7 @@ gridwise_group_convolution_forward_implicit_gemm_v4r4_xdlops_nchw_kcyx_nkhw: ; @
 .set vgpr_write_hw_id,33
 .set vgpr_write_c_id,34
 
-.set vgpr_thread_A_write_offset,36;//36 37
+.set vgpr_thread_write_offset,36;//36 37
 
 
 ;.set vgpr_tmp_int,9
@@ -218,10 +219,11 @@ v_lshlrev_b32_e32 v[vgpr_div_tmp4+1],v[vgpr_div_tmp4],v[vgpr_tmp_1]
 v_mul_lo_u32 v[vgpr_div_tmp4+1],v[vgpr_div_tmp4+1],v[vgpr_write_hw_id]
 v_sub_u32_e32 v[vgpr_write_c_id], v[vgpr_thread_id], v[vgpr_div_tmp4+1]
 
-
+;//final writre addr = (hwid*chw+cid)*2, but everytime hw should +8,c should +threads
 ;v_lshrrev_b32_e32 v[vgpr_write_c_per_thread],3,v[vgpr_thread_id]
 ;//calculate 
 ;div_int_vv_rm vgpr_write_c_8_id,vgpr_write_hw_id,vgpr_thread_id,vgpr_write_c_per_thread,vgpr_div_tmp4,sgpr_div_tmp4
+
 
 
 
@@ -230,6 +232,10 @@ s_waitcnt     lgkmcnt(0);
 
 s_mul_i32 s[sgpr_HiWi],s[sgpr_Wi],s[sgpr_Hi]
 s_mul_i32 s[sgpr_CHiWi],s[sgpr_C],s[sgpr_HiWi]
+
+
+v_mul_lo_u32 v[vgpr_thread_write_offset],v[vgpr_write_hw_id],s[sgpr_CHiWi]
+
 
 s_mov_b32 s[sgpr_read_limit],s[sgpr_HiWi]
 s_mul_i32 s[sgpr_read_limit],s[sgpr_read_limit],s[sgpr_C]
@@ -315,6 +321,7 @@ v_mov_b32_e32 v[vgpr_store_addr+1],0
 
 buffer_store_dwordx4 v[vgpr_read_value:vgpr_read_value+3],v[vgpr_thread_A_addr],s[sgpr_buf_write_addr:sgpr_buf_write_addr+3],0, offen offset:0
 
+v_mov_b32_e32 v[vgpr_write_c_id], s[sgpr_CHiWi]
 global_store_dword v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_write_c_id], s[sgpr_kevin_test_uint_addr:sgpr_kevin_test_uint_addr+1]
 ;global_store_short_d16_hi v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_read_value], s[sgpr_kevin_test_float_addr:sgpr_kevin_test_float_addr+1]
 
