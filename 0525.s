@@ -32,7 +32,7 @@ gridwise_group_convolution_forward_implicit_gemm_v4r4_xdlops_nchw_kcyx_nkhw: ; @
 ;.set sgpr_Ho,36;
 ;.set sgpr_Wo,37;
 
-.set sgpr_C_addr,34;
+.set sgpr_C_addr,34;//34 35
 .set sgpr_buf_read_addr,24;//24 25 26 27
 .set sgpr_before_cmp_thread,28;//28 29
 .set sgpr_tmp_cmp_thread,30;//30 31
@@ -41,10 +41,10 @@ gridwise_group_convolution_forward_implicit_gemm_v4r4_xdlops_nchw_kcyx_nkhw: ; @
 .set sgpr_32,32
 ;.set sgpr_CHiWi,33
 .set sgpr_base_hwid_every_round, 33
-.set sgpr_base_cid_every_round, 34
+.set sgpr_base_cid_every_round, 7
 
 
-.set sgpr_threads_package_size,35
+.set sgpr_threads_package_size,47
 .set sgpr_threads_package_size_log2,46
 
 
@@ -53,7 +53,7 @@ gridwise_group_convolution_forward_implicit_gemm_v4r4_xdlops_nchw_kcyx_nkhw: ; @
 ;.set sgpr_write_c_1_threads,37
 .set sgpr_block_start_addr,38;//38 39
 .set sgpr_buf_read_addr,40;//40 41 42 43
-.set sgpr_buf_write_addr,40;//40 41 42 43
+.set sgpr_buf_write_addr,56;//56 57 58 59
 .set sgpr_read_limit,44
 .set sgpr_loop_num,45
 .set sgpr_tmp_int,46
@@ -272,6 +272,26 @@ s_mov_b32 s[sgpr_buf_read_addr+3],0x27000;s[sgpr_read_limit]
 buffer_load_dwordx4 v[vgpr_read_value:vgpr_read_value+3],v[vgpr_thread_A_addr],s[sgpr_buf_read_addr:sgpr_buf_read_addr+3],0, offen offset:0
 ;buffer_load_ushort v[vgpr_read_value],v[vgpr_thread_A_addr],s[sgpr_buf_read_addr:sgpr_buf_read_addr+3],0, offen offset:0
 
+
+v_lshlrev_b32_e32 v[vgpr_lds_addr_1],s[sgpr_datatype_log2],v[vgpr_thread_id]
+v_mov_b32_e32 v[vgpr_tmp_sgpr],s[sgpr_threads]
+
+v_lshlrev_b32_e32 v[vgpr_interval],s[sgpr_datatype_log2],v[vgpr_tmp_sgpr]
+v_add_u32_e32 v[vgpr_lds_addr_2], v[vgpr_lds_addr_1],v[vgpr_interval]
+
+v_add_u32_e32 v[vgpr_lds_addr_3], v[vgpr_lds_addr_2],v[vgpr_interval]
+
+v_add_u32_e32 v[vgpr_lds_addr_4], v[vgpr_lds_addr_3],v[vgpr_interval]
+
+v_add_u32_e32 v[vgpr_lds_addr_5], v[vgpr_lds_addr_4],v[vgpr_interval]
+
+v_add_u32_e32 v[vgpr_lds_addr_6], v[vgpr_lds_addr_5],v[vgpr_interval]
+
+v_add_u32_e32 v[vgpr_lds_addr_7], v[vgpr_lds_addr_6],v[vgpr_interval]
+
+v_add_u32_e32 v[vgpr_lds_addr_8], v[vgpr_lds_addr_7],v[vgpr_interval]
+
+
 s_waitcnt vmcnt(0)
 ;t0->0 n 0 00
 ;t1->2 n 1 00
@@ -295,9 +315,17 @@ v_lshlrev_b32_e32 v[vgpr_lds_read_offset], s[sgpr_datatype_log2], v[vgpr_div_tmp
 v_mul_lo_u32 v[vgpr_lds_read_offset],v[vgpr_lds_read_offset],v[vgpr_thread_id]
 
 s_waitcnt     lgkmcnt(0)
-ds_read_b128 v[vgpr_thread_write_data:vgpr_thread_write_data+3], v[vgpr_lds_read_offset] offset:0
-;vgpr_thread_write_data
+s_barrier
 
+
+;v_mov_b32_e32 v[vgpr_lds_read_offset],0
+
+ds_read_b128 v[vgpr_thread_write_data:vgpr_thread_write_data+3], v[vgpr_lds_read_offset] offset:0
+
+
+;vgpr_thread_write_data
+;s_mov_b32 s[sgpr_buf_write_addr],s[sgpr_C_addr]
+;s_mov_b32 s[sgpr_buf_write_addr+1],s[sgpr_C_addr+1]
 
 s_add_u32 s[sgpr_buf_write_addr],s[sgpr_C_addr], s[sgpr_block_start_addr]
 s_addc_u32 s[sgpr_buf_write_addr+1],s[sgpr_C_addr+1], s[sgpr_block_start_addr+1]
@@ -307,7 +335,7 @@ s_mov_b32 s[sgpr_buf_write_addr+3],0x27000;
 s_waitcnt     lgkmcnt(0)
 ;v_mov_b32_e32 v[vgpr_thread_write_offset],0
 ;buffer_store_dwordx4 v[vgpr_thread_write_data:vgpr_thread_write_data+3],v[vgpr_thread_write_offset],s[sgpr_buf_write_addr:sgpr_buf_write_addr+3],0, offen offset:0
-
+buffer_store_dword v[vgpr_thread_write_data],v[vgpr_thread_write_offset],s[sgpr_buf_write_addr:sgpr_buf_write_addr+3],0, offen offset:0
 
 
 kevin_write_test:

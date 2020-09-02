@@ -243,25 +243,25 @@ int main(int argc, char *argv[])
     HIP_ASSERT(hipMemcpy(out, dev_out, inSize, hipMemcpyDeviceToHost));
     HIP_ASSERT(hipMemcpy(host_int_test, kevin_int_test, 256*4, hipMemcpyDeviceToHost));
     HIP_ASSERT(hipMemcpy(host_float_test, kevin_float_test, 256*sizeof(half), hipMemcpyDeviceToHost));
-    /*
-    for (int i = 0;i< N * K* Oh* Ow;i++ )
+    
+    for (int i = 0;i<  N * C* Hi* Wi;i++ )
     {
         
-    if ( i<1000)
+    if ( i<32)
         {
-            printf("======verify %d gpu %f  cpu %f=======\n",i,half_cast<float>(out[i]), half_cast<float>(cpu_out[i]));
+            printf("======%d %f=======\n",i,half_cast<float>(out[i]));
         }
-
+/*
         if (half_cast<float>(out[i])-half_cast<float>(cpu_out[i]) >=0.01f)
         {
             //printf("==========error index i %d gpu %f  cpu %f==========\n",i,half_cast<float>(out[i]), half_cast<float>(cpu_out[i]));
             break;
         }
-        
+  */      
 
     }
 
-*/
+
 
 //    HIP_ASSERT(hipMemcpy(host_int_test, kevin_int_test, 256*4, hipMemcpyDeviceToHost));
 //    HIP_ASSERT(hipMemcpy(host_float_test, kevin_float_test, 256*4, hipMemcpyDeviceToHost));
