@@ -235,7 +235,8 @@ s_mul_i32 s[sgpr_CHiWi],s[sgpr_C],s[sgpr_HiWi]
 
 
 v_mul_lo_u32 v[vgpr_thread_write_offset],v[vgpr_write_hw_id],s[sgpr_CHiWi]
-
+v_add_u32_e32 v[vgpr_thread_write_offset],v[vgpr_thread_write_offset],v[vgpr_write_c_id]
+v_lshlrev_b32_e32 v[vgpr_thread_write_offset],s[sgpr_datatype_log2],v[vgpr_thread_write_offset]
 
 s_mov_b32 s[sgpr_read_limit],s[sgpr_HiWi]
 s_mul_i32 s[sgpr_read_limit],s[sgpr_read_limit],s[sgpr_C]
