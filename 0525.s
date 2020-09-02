@@ -92,9 +92,8 @@ gridwise_group_convolution_forward_implicit_gemm_v4r4_xdlops_nchw_kcyx_nkhw: ; @
 .set vgpr_write_c_per_thread,32
 .set vgpr_write_hw_id,33
 .set vgpr_write_c_id,34
-
 .set vgpr_thread_write_offset,36;//36 37
-
+.set vgpr_thread_write_data,40;//40 41 42 43
 
 ;.set vgpr_tmp_int,9
 ;.set vgpr_wave_tid,10
@@ -291,11 +290,23 @@ ds_write_b16_d16_hi v[vgpr_lds_addr_7],v[vgpr_read_value+3] offset:0
 ds_write_b16 v[vgpr_lds_addr_8],v[vgpr_read_value+3] offset:0
 
 www:
-s_add_u32 s[sgpr_buf_write_addr],s[sgpr_kevin_test_float_addr], s[sgpr_block_start_addr]
-s_addc_u32 s[sgpr_buf_write_addr+1],s[sgpr_kevin_test_float_addr+1], s[sgpr_block_start_addr+1]
+v_mov_b32_e32 v[vgpr_div_tmp4],s[sgpr_threads_package_size]
+v_lshlrev_b32_e32 v[vgpr_lds_read_offset], s[sgpr_datatype_log2], v[vgpr_div_tmp4];
+v_mul_lo_u32 v[vgpr_lds_read_offset],v[vgpr_lds_read_offset],v[vgpr_thread_id]
+
+s_waitcnt     lgkmcnt(0)
+ds_read_b128 v[vgpr_thread_write_data:vgpr_thread_write_data+3], v[vgpr_lds_read_offset] offset:0
+;vgpr_thread_write_data
+
+
+s_add_u32 s[sgpr_buf_write_addr],s[sgpr_C_addr], s[sgpr_block_start_addr]
+s_addc_u32 s[sgpr_buf_write_addr+1],s[sgpr_C_addr+1], s[sgpr_block_start_addr+1]
 s_mov_b32 s[sgpr_buf_write_addr+2],-1
 s_mov_b32 s[sgpr_buf_write_addr+3],0x27000;
 
+s_waitcnt     lgkmcnt(0)
+;v_mov_b32_e32 v[vgpr_thread_write_offset],0
+;buffer_store_dwordx4 v[vgpr_thread_write_data:vgpr_thread_write_data+3],v[vgpr_thread_write_offset],s[sgpr_buf_write_addr:sgpr_buf_write_addr+3],0, offen offset:0
 
 
 
@@ -320,10 +331,10 @@ v_cmpx_eq_u32 s[sgpr_tmp_cmp_positive:sgpr_tmp_cmp_positive+1], v[vgpr_thread_id
 v_mov_b32_e32 v[vgpr_store_addr],0
 v_mov_b32_e32 v[vgpr_store_addr+1],0
 
-buffer_store_dwordx4 v[vgpr_read_value:vgpr_read_value+3],v[vgpr_thread_A_addr],s[sgpr_buf_write_addr:sgpr_buf_write_addr+3],0, offen offset:0
+;buffer_store_dwordx4 v[vgpr_read_value:vgpr_read_value+3],v[vgpr_thread_A_addr],s[sgpr_buf_write_addr:sgpr_buf_write_addr+3],0, offen offset:0
 
 v_mov_b32_e32 v[vgpr_write_c_id], s[sgpr_CHiWi]
-global_store_dword v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_write_c_id], s[sgpr_kevin_test_uint_addr:sgpr_kevin_test_uint_addr+1]
+;global_store_dword v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_write_c_id], s[sgpr_kevin_test_uint_addr:sgpr_kevin_test_uint_addr+1]
 ;global_store_short_d16_hi v[vgpr_store_addr:vgpr_store_addr+1], v[vgpr_read_value], s[sgpr_kevin_test_float_addr:sgpr_kevin_test_float_addr+1]
 
 
