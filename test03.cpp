@@ -88,8 +88,8 @@ int main(int argc, char *argv[])
     unsigned int outSize = N * K* Oh* Ow* sizeof(half);
     half *in = (half *)malloc(inSize);
     half *wei = (half *)malloc(weiSize);
-    half *out = (half *)malloc(outSize);
-    half *cpu_out = (half *)malloc(outSize);
+    half *out = (half *)malloc(inSize);
+    half *cpu_out = (half *)malloc(inSize);
 
     printf("=====size is %d=====\n",sizeof(half));
     HIP_ASSERT(hipSetDevice(0));
@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
     half *dev_in, *dev_wei, *dev_out;
     HIP_ASSERT(hipMalloc(&dev_in, inSize));
     HIP_ASSERT(hipMalloc(&dev_wei, weiSize));
-    HIP_ASSERT(hipMalloc(&dev_out, outSize));
+    HIP_ASSERT(hipMalloc(&dev_out, inSize));
 
     for (int i =0;i< N * C* Hi* Wi;i++)
     {
@@ -115,7 +115,7 @@ int main(int argc, char *argv[])
         wei[i] = half_cast<half>(1.0f);
     }
 
-    for (int i =0;i< N * K* Oh* Ow;i++)
+    for (int i =0;i< N * C* Hi* Wi;i++)
     {
         out[i] = half_cast<half>(0.0f);
         cpu_out[i] =  half_cast<half>(0.0f);
@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
 //    cpu_conv_fwd_nchw(in, wei,cpu_out, N, W, H, C, K, R, S , 0 ,0 , 1, 1, 1, 1);
     HIP_ASSERT(hipMemcpy(dev_in, in, inSize, hipMemcpyHostToDevice));
     HIP_ASSERT(hipMemcpy(dev_wei, wei, weiSize, hipMemcpyHostToDevice));
-    HIP_ASSERT(hipMemcpy(dev_out, out, outSize, hipMemcpyHostToDevice));
+    HIP_ASSERT(hipMemcpy(dev_out, out, inSize, hipMemcpyHostToDevice));
 
 
 
@@ -240,7 +240,7 @@ int main(int argc, char *argv[])
 
 
 
-    HIP_ASSERT(hipMemcpy(out, dev_out, outSize, hipMemcpyDeviceToHost));
+    HIP_ASSERT(hipMemcpy(out, dev_out, inSize, hipMemcpyDeviceToHost));
     HIP_ASSERT(hipMemcpy(host_int_test, kevin_int_test, 256*4, hipMemcpyDeviceToHost));
     HIP_ASSERT(hipMemcpy(host_float_test, kevin_float_test, 256*sizeof(half), hipMemcpyDeviceToHost));
     /*
