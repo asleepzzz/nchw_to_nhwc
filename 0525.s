@@ -210,13 +210,16 @@ s_mov_b32 s[sgpr_base_cid_every_round],0
 decide_threads_package_log2 sgpr_threads, sgpr_load_everytime, sgpr_threads_package_size, sgpr_threads_package_size_log2
 
 ;//hw_id=(tid/sgpr_threads_package_size)
-;//c_id =(tid%sgpr_threads_package_size)
+;//c_id =(tid%sgpr_threads_package_size)*8
 v_lshrrev_b32_e32 v[vgpr_write_hw_id] ,s[sgpr_threads_package_size_log2],v[vgpr_thread_id]
 v_mov_b32_e32 v[vgpr_div_tmp4],s[sgpr_threads_package_size_log2]
 v_mov_b32_e32 v[vgpr_tmp_1],1
 v_lshlrev_b32_e32 v[vgpr_div_tmp4+1],v[vgpr_div_tmp4],v[vgpr_tmp_1]
 v_mul_lo_u32 v[vgpr_div_tmp4+1],v[vgpr_div_tmp4+1],v[vgpr_write_hw_id]
 v_sub_u32_e32 v[vgpr_write_c_id], v[vgpr_thread_id], v[vgpr_div_tmp4+1]
+
+v_mov_b32_e32 v[vgpr_tmp_1],3;//it's 8 ,hard code here
+v_lshlrev_b32_e32 v[vgpr_write_c_id],v[vgpr_tmp_1],v[vgpr_write_c_id]
 
 ;//final writre addr = (hwid*chw+cid)*2, but everytime hw should +8,c should +threads
 ;v_lshrrev_b32_e32 v[vgpr_write_c_per_thread],3,v[vgpr_thread_id]
@@ -231,6 +234,15 @@ s_waitcnt     lgkmcnt(0);
 
 s_mul_i32 s[sgpr_HiWi],s[sgpr_Wi],s[sgpr_Hi]
 s_mul_i32 s[sgpr_CHiWi],s[sgpr_C],s[sgpr_HiWi]
+
+;//lds 
+;//    threads 
+;//hw  ------>
+;//everythread read 8
+;//if threads =256 ,t0-t31 load hw 0
+;//t0:c0 t1:c8
+
+
 
 
 v_mul_lo_u32 v[vgpr_thread_write_offset],v[vgpr_write_hw_id],s[sgpr_CHiWi]
@@ -299,18 +311,18 @@ s_waitcnt vmcnt(0)
 ;t3->6 n 3 00  if we want to write n 00 c,easy
 ;we read threads*8(nchw 8 along hw direction)
 ;we write 8(nhwc along c)*threads
-ds_write_b16_d16_hi v[vgpr_lds_addr_1],v[vgpr_read_value] offset:0 ;//hw0 
-ds_write_b16 v[vgpr_lds_addr_2],v[vgpr_read_value] offset:0        ;hw1
-ds_write_b16_d16_hi v[vgpr_lds_addr_3],v[vgpr_read_value+1] offset:0
-ds_write_b16 v[vgpr_lds_addr_4],v[vgpr_read_value+1] offset:0
+ds_write_b16_d16_hi v[vgpr_lds_addr_2],v[vgpr_read_value] offset:0 ;//hw0 
+ds_write_b16 v[vgpr_lds_addr_1],v[vgpr_read_value] offset:0        ;hw1
+ds_write_b16_d16_hi v[vgpr_lds_addr_4],v[vgpr_read_value+1] offset:0
+ds_write_b16 v[vgpr_lds_addr_3],v[vgpr_read_value+1] offset:0
 
-ds_write_b16_d16_hi v[vgpr_lds_addr_5],v[vgpr_read_value+2] offset:0
-ds_write_b16 v[vgpr_lds_addr_6],v[vgpr_read_value+2] offset:0
-ds_write_b16_d16_hi v[vgpr_lds_addr_7],v[vgpr_read_value+3] offset:0
-ds_write_b16 v[vgpr_lds_addr_8],v[vgpr_read_value+3] offset:0
+ds_write_b16_d16_hi v[vgpr_lds_addr_6],v[vgpr_read_value+2] offset:0
+ds_write_b16 v[vgpr_lds_addr_5],v[vgpr_read_value+2] offset:0
+ds_write_b16_d16_hi v[vgpr_lds_addr_8],v[vgpr_read_value+3] offset:0
+ds_write_b16 v[vgpr_lds_addr_7],v[vgpr_read_value+3] offset:0
 
 www:
-v_mov_b32_e32 v[vgpr_div_tmp4],s[sgpr_threads_package_size]
+v_mov_b32_e32 v[vgpr_div_tmp4],s[sgpr_load_everytime];s[sgpr_threads_package_size]
 v_lshlrev_b32_e32 v[vgpr_lds_read_offset], s[sgpr_datatype_log2], v[vgpr_div_tmp4];
 v_mul_lo_u32 v[vgpr_lds_read_offset],v[vgpr_lds_read_offset],v[vgpr_thread_id]
 
@@ -334,8 +346,8 @@ s_mov_b32 s[sgpr_buf_write_addr+3],0x27000;
 
 s_waitcnt     lgkmcnt(0)
 ;v_mov_b32_e32 v[vgpr_thread_write_offset],0
-;buffer_store_dwordx4 v[vgpr_thread_write_data:vgpr_thread_write_data+3],v[vgpr_thread_write_offset],s[sgpr_buf_write_addr:sgpr_buf_write_addr+3],0, offen offset:0
-buffer_store_dword v[vgpr_thread_write_data],v[vgpr_thread_write_offset],s[sgpr_buf_write_addr:sgpr_buf_write_addr+3],0, offen offset:0
+buffer_store_dwordx4 v[vgpr_thread_write_data:vgpr_thread_write_data+3],v[vgpr_thread_write_offset],s[sgpr_buf_write_addr:sgpr_buf_write_addr+3],0, offen offset:0
+;buffer_store_dword v[vgpr_thread_write_data],v[vgpr_thread_write_offset],s[sgpr_buf_write_addr:sgpr_buf_write_addr+3],0, offen offset:0
 
 
 kevin_write_test:
