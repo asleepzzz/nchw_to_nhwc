@@ -247,7 +247,7 @@ int main(int argc, char *argv[])
     for (int i = 0;i<  N * C* Hi* Wi;i++ )
     {
         
-    if ( i<32)
+    if ( i==4096)
         {
             printf("======%d %f=======\n",i,half_cast<float>(out[i]));
         }
